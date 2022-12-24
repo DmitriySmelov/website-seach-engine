@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration status="INFO">
+
+    <Properties>
+        <Property name="LAYOUT_PATTERN">%d %p [%t] %m%n</Property>
+    </Properties>
+
+    <Appenders>
+        <RollingFile name="info" fileName="logs/info.log"
+                     filePattern="logs/$${date:yyyy-MM}/info-app-%d{MM-dd-yyyy}-%i.log">
+            <PatternLayout pattern="${LAYOUT_PATTERN}"/>
+            <LevelRangeFilter minLevel="info" maxLevel="info" onMatch="ACCEPT" onMismatch="DENY"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval = "1"/>
+                <SizeBasedTriggeringPolicy size="250 MB"/>
+            </Policies>
+        </RollingFile>
+
+        <RollingFile name="debug" fileName="logs/debug.log"
+                     filePattern="logs/$${date:yyyy-MM}/debug-app-%d{MM-dd-yyyy}-%i.log">
+            <PatternLayout pattern="${LAYOUT_PATTERN}"/>
+            <LevelRangeFilter minLevel="debug" maxLevel="debug" onMatch="ACCEPT" onMismatch="DENY"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval = "1"/>
+                <SizeBasedTriggeringPolicy size="250 MB"/>
+            </Policies>
+        </RollingFile>
+
+        <RollingFile name="error" fileName="logs/error.log"
+                     filePattern="logs/$${date:yyyy-MM}/error-app-%d{MM-dd-yyyy}-%i.log">
+            <PatternLayout pattern="${LAYOUT_PATTERN}"/>
+            <LevelRangeFilter minLevel="error" maxLevel="warn" onMatch="ACCEPT" onMismatch="DENY"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval = "1"/>
+                <SizeBasedTriggeringPolicy size="250 MB"/>
+            </Policies>
+        </RollingFile>
+    </Appenders>
+
+    <loggers>
+        <Root level="info">
+            <AppenderRef ref="info"/>
+            <AppenderRef ref="error"/>
+            <AppenderRef ref="debug"/>
+        </Root>
+    </loggers>
+</configuration>
