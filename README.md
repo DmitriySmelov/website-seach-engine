@@ -34,6 +34,10 @@ always на never</p>
 <br/>
 <p>Если файла settings.xml нет, создайте его и вставьте в него код из файла settings.xml находящегося в проете, 
 в папке description.</p>
+
+<p class="fig"><img src="description\image\img_11.png" 
+    alt="Изображение"></p>
+<br/>
 <p>Если файл у вас уже есть, но в нём нет блока &lt;servers&gt;, то добавьте в него только этот блок. 
 Если этот блок в файле есть, добавьте внутрь него блок &lt;server&gt; кода из файла settings.xml находящегося в проете, 
 в папке description.</p>
@@ -41,6 +45,10 @@ always на never</p>
 <p>В блоке &lt;value&gt; находится уникальный токен доступа. Если у вас возникнет «401 Ошибка Авторизации» 
 при попытке получения зависимостей, возьмите актуальный токен доступа из документа по
 <a href="https://docs.google.com/document/d/1rb0ysFBLQltgLTvmh-ebaZfJSI7VwlFlEYT9V5_aPjc/edit">ссылке</a>.</p>
+
+<p class="fig"><img src="description\image\img_12.png" 
+    alt="Изображение"></p>
+<br/>
 <p>Обязательно почистите кэш maven. Самый надёжный способ — удалить директорию:</p>
 <br/>
 <p> В Windows: C:/Users/&lt;Имя вашего пользователя&gt;/.m2/repository</p>
@@ -48,7 +56,8 @@ always на never</p>
 <p> В macOs: /Users/&lt;Имя вашего пользователя&gt;/.m2/repository</p>
 <br/>
 <p>После этого снова попробуйте обновить данные из pom.xml.</p>
-
+<br/>
+<br/>
 <h2><b>Структура API.</b></h2>
 <p><b>Запуск полной индексации — метод GET </b></p>
 <p><b>Запрос пользователя: /api/startIndexing
