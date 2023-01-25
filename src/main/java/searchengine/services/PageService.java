@@ -1,10 +1,12 @@
 package searchengine.services;
 
 import org.springframework.stereotype.Service;
+import searchengine.dto.statistics.SearchPageInfo;
 import searchengine.model.Page;
 import searchengine.model.Site;
 import searchengine.repositorys.PageRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -12,18 +14,19 @@ public class PageService
 {
     private PageRepository repository;
 
+    public Optional<Page> findA(Integer id)
+    {
+        return repository.findById(id);
+    }
+
     public PageService(PageRepository repository)
     {
         this.repository = repository;
     }
 
-    synchronized public boolean checkIsPageNew(Page page)
+    public Page save(Page page)
     {
-        Optional<Page> pageFromDB = repository.findByPath(page.getPath());
-        if(pageFromDB.isPresent()) return false;
-
-        repository.save(page);
-        return true;
+        return repository.save(page);
     }
 
     public void deleteById(int id)
@@ -31,19 +34,14 @@ public class PageService
         repository.deleteById(id);
     }
 
-    void formatAllPagesUrlBySite(Site site)
+    public List<SearchPageInfo> getSearchPageInfoByLemmas(List<String> lemmas, int limit, int offset, Integer siteId)
     {
-        repository.formatAllPagesUrlBySite(site);
+        return repository.getSearchPageInfoByLemmas(lemmas, limit, offset, siteId);
     }
 
-    public Optional<Page> findByPath(String path)
+    public Iterable<Page> findAll(List<Integer> id)
     {
-        return repository.findByPath(path);
-    }
-
-    public boolean existsByPath(String path)
-    {
-        return repository.existsByPath(path);
+        return repository.findAllById(id);
     }
 
     public void pageLemmasFrequencyDecrement(Page page)
@@ -51,8 +49,18 @@ public class PageService
         repository.pageLemmasFrequencyDecrement(page);
     }
 
-    public void pageLemmasFrequencyIncrement(Page page)
+    public Optional<Page> findByPathAndSite(String pageUrl, Site site)
     {
-        repository.pageLemmasFrequencyIncrement(page);
+        return repository.findByPathAndSite(pageUrl,site);
+    }
+
+    public void deleteAllInBatch()
+    {
+        repository.deleteAllInBatch();
+    }
+
+    public int countBySite(Site site)
+    {
+        return repository.countBySite(site);
     }
 }

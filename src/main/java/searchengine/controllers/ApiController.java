@@ -2,32 +2,34 @@ package searchengine.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import searchengine.dto.statistics.IndexingResponse;
+import searchengine.dto.statistics.PageSearchResponse;
 import searchengine.dto.statistics.StatisticsResponse;
-import searchengine.model.Page;
+import searchengine.services.SearchService;
 import searchengine.services.SiteIndexerService;
 import searchengine.services.StatisticsService;
 
 @RestController
 @RequestMapping("/api")
-public class ApiController {
-
+public class ApiController
+{
     private final StatisticsService statisticsService;
     private final SiteIndexerService siteIndexerService;
+    private SearchService searchService;
 
     @Autowired
-    public ApiController(StatisticsService statisticsService,
+    public ApiController(StatisticsService statisticsService, SearchService searchService,
                          SiteIndexerService siteIndexerService)
     {
+        this.searchService = searchService;
         this.siteIndexerService = siteIndexerService;
         this.statisticsService = statisticsService;
     }
 
     @GetMapping("/statistics")
-    public ResponseEntity<StatisticsResponse> statistics() {
+    public ResponseEntity<StatisticsResponse> statistics()
+    {
         return ResponseEntity.ok(statisticsService.getStatistics());
     }
 
@@ -41,10 +43,24 @@ public class ApiController {
     @GetMapping("/startIndexing")
     public ResponseEntity<IndexingResponse> startIndexing()
     {
-        IndexingResponse response = new IndexingResponse(siteIndexerService.checkIsIndexingPossibility());
+        siteIndexerService.isStartIndexingPossibility();
         siteIndexerService.startIndexing();
-//        siteIndexerService.indexingUserInputPage("https://artmuseum26.ru/");
-
         return ResponseEntity.ok(new IndexingResponse(true));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<PageSearchResponse> search(@RequestParam String query,
+                                                     @RequestParam(required = false) String site,
+                                                     @RequestParam int limit, @RequestParam int offset )
+    {
+        PageSearchResponse response = searchService.search(query, site, limit ,offset);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/indexPage")
+    public ResponseEntity<IndexingResponse> indexPage(@RequestParam String url)
+    {
+        IndexingResponse response = new IndexingResponse(siteIndexerService.indexingUserInputPage(url));
+        return ResponseEntity.ok(response);
     }
 }

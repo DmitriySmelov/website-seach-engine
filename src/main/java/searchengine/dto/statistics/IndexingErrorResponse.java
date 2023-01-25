@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class IndexingErrorResponse
 {
-
     private boolean result = false;
     private final String error;
 }

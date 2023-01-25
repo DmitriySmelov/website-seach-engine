@@ -15,6 +15,8 @@ import java.util.Set;
 @NoArgsConstructor
 @Getter
 @Setter
+@DynamicInsert
+@DynamicUpdate
 public class Lemma
 {
     @Id
@@ -37,7 +39,6 @@ public class Lemma
             joinColumns = @JoinColumn(name = "lemma_id"),
             inverseJoinColumns = @JoinColumn(name = "page_id"))
     private Set<Page> pages;
-
 
     public void addPage(Page page)
     {

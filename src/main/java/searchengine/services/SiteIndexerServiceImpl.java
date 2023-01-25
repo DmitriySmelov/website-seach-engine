@@ -1,5 +1,7 @@
 package searchengine.services;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -8,41 +10,49 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import searchengine.config.IndexingConfig;
 import searchengine.config.SiteConfig;
-import searchengine.dto.statistics.PageInfo;
+import searchengine.dto.statistics.*;
 import searchengine.exceptions.IndexingException;
 import searchengine.model.*;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 
 @Service
 public class SiteIndexerServiceImpl implements SiteIndexerService
 {
     @Setter
+    @Getter
     private volatile boolean isIndexingStarted;
     @Setter
     private volatile boolean isIndexingStopped;
-    private final PageLemmaIndexerServiceImpl pageLemmaIndexer;
+    private final LemmaIndexerService lemmaIndexer;
     private final SiteService siteService;
     private final IndexingConfig indexingConfig;
     private final PageService pageService;
+    private Set<Integer> indexingSiteIds = ConcurrentHashMap.newKeySet();
+    private Indexer defaultIndexer = new Indexer();
+    private ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
     private final Logger log = LogManager.getLogger(SiteIndexerServiceImpl.class.getName());
 
     @Autowired
     public SiteIndexerServiceImpl(SiteService siteService, IndexingConfig indexingConfig,
-                                  PageLemmaIndexerServiceImpl pageLemmaIndexer, PageService pageService)
+                                  LemmaIndexerService lemmaIndexer, PageService pageService)
     {
         this.siteService = siteService;
         this.indexingConfig = indexingConfig;
-        this.pageLemmaIndexer = pageLemmaIndexer;
+        this.lemmaIndexer = lemmaIndexer;
         this.pageService = pageService;
     }
 
-    public boolean checkIsIndexingPossibility()
+    synchronized public boolean isStartIndexingPossibility()
     {
         if (isIndexingStarted) throw new IndexingException("Индексация уже запущена.",
                 "attempt to start indexing failed, reason: indexing is already started", HttpStatus.FORBIDDEN);
@@ -51,6 +61,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         return true;
     }
 
+    @Async
     public void startIndexing()
     {
         try
@@ -61,83 +72,136 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         {
             setIndexingStarted(false);
             setIndexingStopped(false);
+            indexingSiteIds.clear();
         }
     }
 
     private void indexingAllSites()
     {
-        ArrayList<ForkJoinParser> tasks = new ArrayList<>();
+        deleteAllSites();
         List<Site> sites = getAllSitesFromConfig();
 
-        sites.forEach(site ->
-        {
-            String siteUrl = site.getUrl();
-            tasks.add(new ForkJoinParser(siteUrl, site));
-        });
+        List<Callable<Boolean>> indexingTasks = getIndexingTasks(sites);
 
-        ForkJoinParser.invokeAll(tasks);
+        runStatusTimeRefresher();
 
-        sites.forEach(site ->
-        {
-            if(!checkSiteForError(site)) site.setStatus(Status.INDEXED);
+        forkJoinPool.invokeAll(indexingTasks);
+    }
 
-            pageService.formatAllPagesUrlBySite(site);
-            siteService.siteLemmasFrequencyIncrement(site);
-        });
+    private void deleteAllSites()
+    {
+        lemmaIndexer.deleteAll();
+        pageService.deleteAllInBatch();
+        siteService.deleteAllInBatch();
     }
 
     private List<Site> getAllSitesFromConfig()
     {
-        return indexingConfig.getSites().stream().map(s -> {
-            String siteUrl = getValidSiteUrlFormat(s.getUrl());
+        return indexingConfig.getSites()
+                .stream()
+                .map(s -> {
+                    String siteUrl = getValidUrlFormat(s.getUrl());
 
-            Site site = new Site();
-            siteService.deleteByUrl(siteUrl);
-            site.setStatus(Status.INDEXING);
-            site.setStatusTime(new Date());
-            site.setName(s.getName());
-            site.setUrl(siteUrl);
-            siteService.save(site);
-            return site;
-        }).toList();
+                    Site site = new Site();
+                    site.setStatus(Status.INDEXING);
+                    site.setStatusTime(LocalDateTime.now());
+                    site.setName(s.getName());
+                    site.setUrl(siteUrl);
+                    siteService.save(site);
+                    return site;
+                }).toList();
     }
 
-    private String getValidSiteUrlFormat(String siteUrl)
+    private void runStatusTimeRefresher()
     {
-        siteUrl.trim();
-        return siteUrl.endsWith("/") ? siteUrl : siteUrl.concat("/");
+        Thread thread = new Thread(() -> {
+            try
+            {
+                while (!indexingSiteIds.isEmpty())
+                {
+                    siteService.updateAllStatusTime(indexingSiteIds, LocalDateTime.now());
+                    Thread.sleep(10_000);
+                }
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        });
+        thread.start();
     }
 
-    private String getValidPageUrlFormat(String siteUrl, String pageUrl)
+    private List<Callable<Boolean>> getIndexingTasks(List<Site> sites)
     {
-        return pageUrl.replaceFirst(siteUrl, "/");
+        List<Callable<Boolean>> indexingTasks = new ArrayList<>();
+
+        sites.forEach(site ->
+        {
+            PageInfo info = indexingPage(site, site.getUrl(), "/");
+            Page mainPage = info != null ? info.getPage() : null;
+
+            if (!determineSiteLastError(site, mainPage))
+            {
+                indexingSiteIds.add(site.getId());
+                List<ForkJoinParser> siteIndexersTasks = new ArrayList<>();
+                Indexer indexer = new Indexer(site);
+                indexer.addUrl(getValidUrlFormat(site.getUrl()));
+
+                siteIndexersTasks.addAll(info.getChildLinks().stream().filter(link -> indexer.isCorrectUrl(link, site.getUrl()))
+                        .map(link -> new ForkJoinParser(indexer, link)).toList());
+
+                indexingTasks.add(getSingleSiteIndexingTask(indexer, siteIndexersTasks));
+
+            }
+        });
+        return indexingTasks;
     }
 
-    private boolean checkSiteForError(Site site)
+    private PageInfo indexingPage(Site site, String pageUrl, String urlForSaving)
     {
-        if(site.getStatus() == Status.FAILED) return true;
+        return defaultIndexer.indexing(site, pageUrl, urlForSaving);
+    }
 
-        String siteError = getErrorMessage(site.getUrl());
+    private Callable<Boolean> getSingleSiteIndexingTask(Indexer indexer, List<ForkJoinParser> tasks)
+    {
+        return () -> {
+            Integer siteId = indexer.getSite().getId();
+            indexingSiteIds.add(siteId);
+            ForkJoinParser.invokeAll(tasks);
+            indexingSiteIds.remove(siteId);
 
-        if(siteError == null) return false;
+            if(indexer.getStatus() != Status.FAILED) indexer.setStatus(Status.INDEXED);
+            indexer.getSite().setStatusTime(LocalDateTime.now());
+            siteService.save(indexer.getSite());
+            indexer.clear();
+            return true;
+        };
+    }
+
+    private boolean determineSiteLastError(Site site, Page mainPage)
+    {
+        String siteError = getErrorMessage(mainPage);
+        site.setLastError(siteError);
+
+        if(siteError.equals("")) return false;
 
         site.setStatus(Status.FAILED);
-        site.setLastError(siteError);
+        siteService.save(site);
+
         return true;
     }
 
-    private String getErrorMessage(String pageUrl)
+    private String getErrorMessage(Page page)
     {
         String defaultError = "Ошибка индексации: не удалось проиндексировать сайт " +
                 "проверьте корректность введенных данных.";
-        Optional<Page> opPage = pageService.findByPath(pageUrl);
-        if (opPage.isPresent())
+        if (page != null)
         {
-            int statusCode = opPage.get().getCode();
+            int statusCode = page.getCode();
 
             if (statusCode == 200)
             {
-                return null;
+                return "";
             }
 
             if (statusCode >= 300 && statusCode < 400)
@@ -147,20 +211,24 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
             }
             else
             {
-               return switch (statusCode)
-                {
-                    case 400, 403 -> "Ошибка индексации: отказ в доступе со стороны сайта.";
-                    case 404 -> "Ошибка индексации: главная страница сайта не найдена.";
-                    case 500 -> "Ошибка индексации: ошибка сервера со стороны сайта.";
-                    default -> defaultError;
-                };
+                return switch (statusCode)
+                        {
+                            case 400, 403 -> "Ошибка индексации: отказ в доступе со стороны сайта.";
+                            case 404 -> "Ошибка индексации: главная страница сайта не найдена.";
+                            case 500 -> "Ошибка индексации: ошибка сервера со стороны сайта.";
+                            default -> defaultError;
+                        };
             }
         }
         return defaultError;
     }
 
+    private String getValidUrlFormat(String url)
+    {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
 
-    public boolean stopIndexing()
+    synchronized public boolean stopIndexing()
     {
         if (!isIndexingStarted) throw new IndexingException("Индексация не запущена",
                 "attempt to stop indexing failed, reason: indexing not started", HttpStatus.FORBIDDEN);
@@ -170,170 +238,204 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         return true;
     }
 
-    public boolean indexingUserInputPage(String pageUrl)    //не проверял
+    private String getValidPageUrlForSaving(String url, int rootUrlLength)
     {
-        SiteConfig siteFromConfig = getSiteFromConfigByPageUrl(pageUrl);
-
-        Site site = getSiteFromDB(siteFromConfig.getUrl());
-        String validPageUrl = getValidPageUrlFormat(site.getUrl(), pageUrl);
-
-        Optional<Page> pageFromDb = pageService.findByPath(validPageUrl);
-        if(pageFromDb.isPresent())
-        {
-            Page page = pageFromDb.get();
-            pageService.pageLemmasFrequencyDecrement(page);
-            pageService.deleteById(page.getId());
-        }
-        try
-        {
-            PageInfo info = indexingPage(site, pageUrl);
-            if (info != null )
-            {
-                Page page = info.getPage();
-                pageService.pageLemmasFrequencyIncrement(page);
-            }
-        }
-        catch (IOException e)
-        {
-            //TODO
-            e.printStackTrace();
-        }
-        catch (Exception ex)
-        {
-            //TODO
-            ex.printStackTrace();
-        }
-        String error = getErrorMessage(validPageUrl);
-        if(error == null) return true;
-
-        throw new IndexingException(error, String.format("request to index page(%s) by user failed",pageUrl),
-                HttpStatus.BAD_REQUEST);
+        return url.endsWith("/") ?
+                url.substring(rootUrlLength, url.length() -1) : url.substring(rootUrlLength);
     }
 
-    private SiteConfig getSiteFromConfigByPageUrl(String pageUrl)
+    public boolean indexingUserInputPage(String pageUrl)
+    {
+        Page page = null;
+        SiteConfig siteFromConfig = getSiteForReindexingPage(pageUrl);
+
+        Site site = getSiteFromDB(siteFromConfig.getUrl());
+        String validPageUrl = getValidPageUrlForSaving(pageUrl, site.getUrl().length());
+
+        Optional<Page> optionalPage = pageService.findByPathAndSite(validPageUrl, site);
+
+        optionalPage.ifPresent(this::deletePageForReindexing);
+        PageInfo info = indexingPage(site, pageUrl, validPageUrl);
+
+        if(info == null)
+        {
+            String error = getErrorMessage(page);
+            throw new IndexingException(error, String.format("request to index page(%s) by user failed",pageUrl),
+                    HttpStatus.BAD_REQUEST);
+        }
+        return true;
+    }
+
+    private SiteConfig getSiteForReindexingPage(String pageUrl)
     {
         return indexingConfig.getSites()
-            .stream()
-            .filter(site -> pageUrl.contains(site.getUrl())).findAny().orElseThrow(() ->
-                    new IndexingException("Данная страница находится за пределами сайтов, " +
-                            "указанных в конфигурационном файле",
-                            String.format("request to index a page(%s) outside of sites config file", pageUrl),
-                            HttpStatus.BAD_REQUEST)
-            );
+                .stream()
+                .filter(site -> pageUrl.contains(site.getUrl())).findAny().orElseThrow(() ->
+                        new IndexingException("Данная страница находится за пределами сайтов, " +
+                                "указанных в конфигурационном файле",
+                                String.format("request to index a page(%s) outside of sites config file", pageUrl),
+                                HttpStatus.BAD_REQUEST)
+                );
+    }
+
+    private void deletePageForReindexing(Page page)
+    {
+        pageService.pageLemmasFrequencyDecrement(page);
+        pageService.deleteById(page.getId());
     }
 
     private Site getSiteFromDB(String siteUrl)
     {
         return siteService
-                .findByUrl(getValidSiteUrlFormat(siteUrl))
+                .findByUrlAndStatus(getValidUrlFormat(siteUrl), Status.INDEXED)
                 .orElseThrow(() -> new IndexingException("Ошибка: сайт с введенной страницей не проиндексирован.",
                         "request to index a page of a non-indexed site.", HttpStatus.FORBIDDEN));
     }
 
-    private PageInfo indexingPage(Site site, String pageUrl)
-            throws IOException {
-        Connection.Response response = Jsoup.connect(pageUrl)
-                .userAgent(indexingConfig.getUserAgent())
-                .referrer(indexingConfig.getReferrer())
-                .execute();
-
-        int statusCode = response.statusCode();
-        Document doc = response.parse();
-
-        String html = doc.outerHtml();
-
-        Page page = new Page();
-        page.setPath(pageUrl);
-        page.setCode(statusCode);
-        page.setSite(site);
-        page.setContent(html);
-        if(!pageService.checkIsPageNew(page)) return null;
-
-        pageLemmaIndexer.indexingPage(site, page, doc);
-
-        if( page.getCode() == 200 )
+    @NoArgsConstructor
+    public class Indexer
         {
+        private Set<String> uniqueUrls = ConcurrentHashMap.newKeySet();
+        int siteUrlLength;
+        @Getter
+        Site site;
 
-            List<String> childLinks = doc
-                    .select("a:not(:has(img)):not([type])")
-                    .eachAttr("abs:href");
-            PageInfo info = new PageInfo(page, childLinks);
-            return info;
-        }
-        return null;
-    }
-
-    private class ForkJoinParser extends RecursiveAction
-    {
-        private String pageUrl;
-        private Site site;
-
-        private ForkJoinParser(String pageUrl, Site site)
+        Indexer(Site site)
         {
-            this.pageUrl = pageUrl;
-            this.site= site;
+            this.site = site;
+            siteUrlLength = site.getUrl().length();
         }
 
-        @Override
-        protected void compute()
+        public String getUrlForSaving(String url)
         {
-            if(!checkIsIndexingStopped())
+            return getValidPageUrlForSaving(url, siteUrlLength);
+        }
+
+        public PageInfo indexing(Site site, String pageUrl, String urlForSaving)
+        {
+            try
             {
-                PageInfo info = indexPage(site, pageUrl);
-                if(info != null)
-                {
-                    List<String> childPages = info.getChildLinks();
+                Connection.Response response = connectionToUrl(pageUrl);
 
+                if (!response.contentType().contains("text/html")) return null;
 
-                    invokeTasksForChildPages(childPages);
-                }
+                return getPageInfo(response, site, urlForSaving);
+            }
+            catch (IOException e)
+            {
+                log.debug("Error when trying to connect to URI during indexing.", e);
+            }
+            return null;
+        }
+
+        private Connection.Response connectionToUrl(String url) throws IOException
+        {
+            return Jsoup.connect(url)
+                    .userAgent(indexingConfig.getUserAgent())
+                    .referrer(indexingConfig.getReferrer())
+                    .ignoreContentType(true)
+                    .execute();
+        }
+
+        private PageInfo getPageInfo(Connection.Response response, Site site, String urlForSaving)
+                throws IOException
+        {
+
+            int statusCode = response.statusCode();
+
+            Page page = new Page();
+            page.setPath(urlForSaving);
+            page.setCode(statusCode);
+            page.setSite(site);
+
+            if(statusCode == 200)
+            {
+                Document doc = response.parse();
+                page.setContent(doc.outerHtml());
+                pageService.save(page);
+
+                startLemmaIndexing(site, page, doc);
+
+                PageInfo info = getPageInfoFromHtml(doc, page);
+
+                urlForSaving = null;
+                response = null;
+                doc = null;
+
+                return info;
+            }
+            else
+            {
+                page.setContent("");
+                pageService.save(page);
+            }
+            return null;
+        }
+
+        private void startLemmaIndexing(Site site, Page page, Document html)
+        {
+            Map<Lemma, Float> lemmas = lemmaIndexer.getLemmas(site, page, html);
+            synchronized (this)
+            {
+                lemmaIndexer.saveNewLemmas(lemmas);
+            }
+            synchronized (this)
+            {
+                lemmaIndexer.saveIndexesByLemma(lemmas, page);
             }
         }
 
-        private PageInfo indexPage(Site site, String pageUrl)
+        private PageInfo getPageInfoFromHtml(Document html, Page page)
         {
+            if(html != null)
+            {
+                List<String> childLinks = html
+                        .select("a")
+                        .eachAttr("abs:href");
 
-                if(pageService.existsByPath(pageUrl)) return null;
-
-                try
-                {
-                    Thread.sleep(500);
-                    return indexingPage(site, pageUrl);
-                }
-                catch (InterruptedException e)
-                {
-                    log.error("Sleeping between requests aborted.", e);
-                }
-                catch (IOException e)
-                {
-                    log.debug("Error when trying to connect to URI during indexing.", e);
-                }
+                return new PageInfo(page, childLinks);
+            }
 
             return null;
         }
 
-        private void invokeTasksForChildPages(List<String> childPages)
+        public boolean isCorrectUrl(String pageUrl, String rootUrl)
         {
-            ArrayList<ForkJoinParser> taskList = new ArrayList<>();
-
-            childPages.stream()
-                    .filter(link -> !link.contains("#") && link.startsWith(site.getUrl()))
-                    .forEach(link ->
-                    {
-                        ForkJoinParser task = new ForkJoinParser(link, site);
-                        taskList.add(task);
-                    });
-
-            if(!checkIsIndexingStopped()) ForkJoinParser.invokeAll(taskList);
+            pageUrl = getValidUrlFormat(pageUrl);
+            return pageUrl.startsWith(rootUrl)
+                    && !pageUrl.contains("#")
+                    && !pageUrl.contains("?")
+                    && !pageUrl.matches(".+(?i)(?:.jpg/?|.png/?|.pdf/?)$")
+                    && addUrl(pageUrl);
         }
 
-        private boolean checkIsIndexingStopped()
+        public boolean checkIsIndexingStopped()
         {
             if(!isIndexingStopped) return false;
 
             site.setStatus(Status.FAILED);
             site.setLastError("Индексация остановлена пользователем.");
             return true;
+        }
+
+        public Status getStatus()
+        {
+            return site.getStatus();
+        }
+
+        public void setStatus(Status status)
+        {
+            site.setStatus(status);
+        }
+
+        public void clear()
+        {
+            uniqueUrls.clear();
+        }
+
+        public boolean addUrl(String pageUrl)
+        {
+            return uniqueUrls.add(pageUrl);
         }
     }
 }

@@ -6,24 +6,24 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.model.Site;
+import searchengine.model.Status;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
 public interface SiteRepository extends JpaRepository<Site, Integer>
 {
+    @Query(value = "select id from sites where status = 'INDEXED' limit 1", nativeQuery = true)
+    Integer findIndexedSitId();
+
+    @Query(value = "select id from sites where status = 'INDEXED' and url = ?1", nativeQuery = true)
+    Integer getSiteIdIfIndexed(String siteUrl);
+
+    Optional<Site> findByUrlAndStatus(String url, Status status);
+
     @Modifying
     @Transactional
-    void deleteByUrl(String siteUrl);
-
-    Optional<Site> findByUrl(String siteUrl);
-
-    @Modifying
-    @Transactional
-    @Query(value = "update lemmas set frequency = lemmas.frequency + " +
-            "(select count(id) from `indexes` where lemmas.id = `indexes`.lemma_id and " +
-            "`indexes`.page_id in (select id from pages where site_id = lemmas.site_id)) " +
-            "where site_id = :#{#site.id}",
-            nativeQuery = true)
-    void siteLemmasFrequencyIncrement(Site site);
+    @Query(value = "update sites set status_time = ?2 where id in ?1", nativeQuery = true)
+    void updateAllStatusTime(Iterable<Integer> indexingSiteIds, LocalDateTime localDateTime);
 }

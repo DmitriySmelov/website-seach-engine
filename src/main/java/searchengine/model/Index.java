@@ -15,6 +15,8 @@ import javax.persistence.Table;
 @NoArgsConstructor
 @Getter
 @Setter
+@DynamicInsert
+@DynamicUpdate
 public class Index
 {
     @Id
@@ -22,7 +24,7 @@ public class Index
     @GenericGenerator(name = "index_generator", strategy = "increment")
     private int id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.MERGE)
     @JoinColumn(name = "page_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Page page;

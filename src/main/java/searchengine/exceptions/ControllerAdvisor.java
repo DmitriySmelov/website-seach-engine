@@ -14,7 +14,7 @@ public class ControllerAdvisor extends ResponseEntityExceptionHandler
 {
     private final Logger log = LogManager.getLogger(ControllerAdvisor.class.getName());
 
-    @ExceptionHandler(IndexingException.class)
+    @ExceptionHandler({IndexingException.class, SearchException.class})
     public ResponseEntity<IndexingErrorResponse> handleIndexingExceptions(
             IndexingException ex, WebRequest request)
     {

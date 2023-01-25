@@ -10,6 +10,7 @@
 <html class="ie9" lang="ru">
 <![endif]-->
 <!--[if gt IE 9]><!--> <html lang="ru"> <!--<![endif]-->
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns="http://www.w3.org/1999/html"> <!--<![endif]-->
 <head>
   <title>Site Search Engine</title>
   <meta name="description" content="Site Search Engine">
@@ -103,7 +104,11 @@
                   </h2>
                 </div>
                 <div>
-                  <button class="btn btn_primary API-startIndexing" data-btntype="check" data-check="false" data-alttext="Stop indexing" data-send="startIndexing" data-altsend="stopIndexing"><span class="btn-content">Start indexing</span>
+                  <button class="btn btn_primary API-startIndexing"
+                          data-btntype="check" data-check="false"
+                          th:data-alttext="stopIndexing" data-alttext=""
+                          data-send="startIndexing" data-altsend="stopIndexing">
+                    <span class="btn-content" th:text="startIndexing"></span>
                   </button>
                 </div><br>
                 <div class="UpdatePageBlock">
@@ -136,7 +141,7 @@
                     </div>
                   </div>
                   <div class="form-group form-group_row">
-                    <input class="form-input" id="query" name="query" type="text" placeholder="Query"/>
+                    <input class="form-input" id="query" name="query"  type="text"  placeholder="Query" required />
                     <button class="btn btn_primary form-btn" type="submit">Search
                     </button>
                   </div>

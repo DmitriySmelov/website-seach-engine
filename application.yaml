@@ -18,17 +18,23 @@ spring:
         order_updates: true
     hibernate:
       ddl-auto: none
-    show-sql: true
+    show-sql: false
   sql:
     init:
-      mode: never
+      mode: always
 
 
 indexing-settings:
   sites:
+    - url: https://volochek.life/
+      name: Volochek
+    - url: https://dombulgakova.ru/
+      name: Dombulgakova
+    - url: http://cimus.biz
+      name: Cimus
     - url: https://nikoartgallery.com/
-      name: Галерея искусств Нико
-    - url: https://artmuseum26.ru/
-      name: artmuseum26.ru
+      name: Nikoartgallery
+    - url: http://www.playback.ru/
+      name: Playback
   user-agent: GockSearchBot
   referrer: http://www.google.com

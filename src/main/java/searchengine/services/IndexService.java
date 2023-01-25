@@ -3,8 +3,9 @@ package searchengine.services;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import searchengine.model.Index;
-import searchengine.model.Page;
 import searchengine.repositorys.IndexRepository;
+
+import java.util.List;
 
 @Service
 public class IndexService
@@ -17,9 +18,14 @@ public class IndexService
         this.repository = repository;
     }
 
-    public Iterable<Index> saveAll(Iterable<Index> indexes)
+    public void saveAll(List<Index> indexes)
     {
-        return repository.saveAll(indexes);
+        repository.saveAll(indexes);
+    }
+
+    public void deleteAllInBatch()
+    {
+        repository.deleteAllInBatch();
     }
 
 }

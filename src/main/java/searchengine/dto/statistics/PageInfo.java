@@ -10,8 +10,8 @@ import java.util.List;
 @NoArgsConstructor
 public class PageInfo
 {
-    Page page;
-    List<String> childLinks;
+    private Page page;
+    private List<String> childLinks;
 
     public PageInfo(Page page, List<String> childLinks)
     {

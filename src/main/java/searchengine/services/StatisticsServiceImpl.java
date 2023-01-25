@@ -1,60 +1,62 @@
 package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import searchengine.config.SiteConfig;
-import searchengine.config.IndexingConfig;
 import searchengine.dto.statistics.DetailedStatisticsItem;
 import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
+import searchengine.model.Site;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
-public class StatisticsServiceImpl implements StatisticsService {
+public class StatisticsServiceImpl implements StatisticsService
+{
+    private LemmaService lemmaService;
+    private SiteService siteService;
+    private PageService pageService;
+    private SiteIndexerService siteIndexerService;
 
-    private final Random random = new Random();
-    private final IndexingConfig sites;
-
-
+    @Autowired
+    StatisticsServiceImpl(SiteService siteService, PageService pageService,
+                          LemmaService lemmaService, SiteIndexerService siteIndexerService)
+    {
+        this.lemmaService = lemmaService;
+        this.pageService = pageService;
+        this.siteService = siteService;
+        this.siteIndexerService = siteIndexerService;
+    }
 
     @Override
-    public StatisticsResponse getStatistics() {
-        String[] statuses = { "INDEXED", "FAILED", "INDEXING" };
-        String[] errors = {
-                "Ошибка индексации: главная страница сайта не доступна",
-                "Ошибка индексации: сайт не доступен",
-                ""
-        };
-
+    public StatisticsResponse getStatistics()
+    {
         TotalStatistics total = new TotalStatistics();
-        total.setSites(sites.getSites().size());
-        total.setIndexing(true);
+        total.setSites(siteService.count());
+        total.setIndexing(siteIndexerService.isIndexingStarted());
 
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
-        List<SiteConfig> sitesList = sites.getSites();
-        for(int i = 0; i < sitesList.size(); i++) {
-            SiteConfig site = sitesList.get(i);
+        List<Site> sitesList = siteService.findAll();
+        for (Site site : sitesList)
+        {
             DetailedStatisticsItem item = new DetailedStatisticsItem();
             item.setName(site.getName());
             item.setUrl(site.getUrl());
-            int pages = random.nextInt(1_000);
-            int lemmas = pages * random.nextInt(1_000);
+            int pages = pageService.countBySite(site);
+            int lemmas = lemmaService.countBySite(site);
             item.setPages(pages);
             item.setLemmas(lemmas);
-            item.setStatus(statuses[i % 3]);
-            item.setError(errors[i % 3]);
-            item.setStatusTime(System.currentTimeMillis() -
-                    (random.nextInt(10_000)));
+            item.setStatus(String.valueOf(site.getStatus()));
+            item.setError(site.getLastError());
+            item.setStatusTime(site.getStatusTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
             total.setPages(total.getPages() + pages);
             total.setLemmas(total.getLemmas() + lemmas);
             detailed.add(item);
         }
-
         StatisticsResponse response = new StatisticsResponse();
         StatisticsData data = new StatisticsData();
         data.setTotal(total);

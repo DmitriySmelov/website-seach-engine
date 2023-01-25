@@ -4,15 +4,15 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigInteger;
+import java.util.List;
+
 @Data
 @Setter
 @Getter
-public class IndexingResponse
+public class PageSearchResponse
 {
     private boolean result;
-
-    public IndexingResponse(boolean result)
-    {
-        this.result =result;
-    }
+    private BigInteger count;
+    private List<PageSearchData> data;
 }
