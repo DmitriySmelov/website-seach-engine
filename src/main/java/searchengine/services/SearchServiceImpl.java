@@ -88,10 +88,11 @@ public class SearchServiceImpl implements SearchService
                 siteService.findIndexedSitId() : siteService.getSiteIdIfIndexed(siteUrl);
         if (indexedSiteId == null)
         {
-            String siteForError = siteUrl == null ? "sites" : siteUrl;
-            throw new IndexingException("Не удалось совершить поиск, причина: " +
-                    "индексация сайта(ов) не произведена.",
-                    String.format("Search query is failed. Reason: %s not indexed.", siteForError),
+            String userError = siteUrl == null ? "сайтов" : "введенного сайта";
+            String logError = siteUrl == null ? "sites" : "site " + siteUrl;
+            throw new IndexingException(String.format("Не удалось совершить поиск, причина: " +
+                    "индексация %s не произведена.", userError),
+                    String.format("Search query is failed. Reason: %s not indexed.", logError),
                     HttpStatus.FORBIDDEN);
         }
         return isSearchByAllSites ? null : indexedSiteId;
