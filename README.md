@@ -32,7 +32,7 @@ always на never</p>
 <p> В Linux — в директории: /home/&lt;Имя вашего пользователя&gt;/.m2</p>
 <p> В macOs — по адресу: /Users/&lt;Имя вашего пользователя&gt;/.m2</p>
 <br/>
-<p>Если файла settings.xml нет, создайте его и вставьте в него код из файла settings.xml находящегося в проете, 
+<p>Если файла settings.xml нет, скопируйте файл settings.xml находящийся в проете, 
 в папке description.</p>
 
 <p class="fig"><img src="description\image\img_11.png" 
