@@ -17,8 +17,8 @@ import javax.persistence.Table;
 @Setter
 @DynamicInsert
 @DynamicUpdate
-public class Index
-{
+public class Index {
+
     @Id
     @GeneratedValue(generator = "index_generator")
     @GenericGenerator(name = "index_generator", strategy = "increment")

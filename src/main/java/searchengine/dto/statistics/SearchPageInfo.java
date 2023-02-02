@@ -8,8 +8,8 @@ import java.math.BigInteger;
 @NoArgsConstructor
 @Getter
 @Setter
-public class SearchPageInfo
-{
+public class SearchPageInfo {
+
     private Integer id;
     private Double relevance;
     private BigInteger count;

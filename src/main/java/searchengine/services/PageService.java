@@ -10,57 +10,47 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class PageService
-{
+public class PageService {
+
     private PageRepository repository;
 
-    public Optional<Page> findA(Integer id)
-    {
+    public Optional<Page> findA(Integer id) {
         return repository.findById(id);
     }
 
-    public PageService(PageRepository repository)
-    {
+    public PageService(PageRepository repository) {
         this.repository = repository;
     }
 
-    public Page save(Page page)
-    {
+    public Page save(Page page) {
         return repository.save(page);
     }
 
-    public void deleteById(int id)
-    {
+    public void deleteById(int id) {
         repository.deleteById(id);
     }
 
-    public List<SearchPageInfo> getSearchPageInfoByLemmas(List<String> lemmas, int limit, int offset, Integer siteId)
-    {
+    public List<SearchPageInfo> getSearchPageInfoByLemmas(List<String> lemmas, int limit, int offset, Integer siteId) {
         return repository.getSearchPageInfoByLemmas(lemmas, limit, offset, siteId);
     }
 
-    public Iterable<Page> findAll(List<Integer> id)
-    {
+    public Iterable<Page> findAll(List<Integer> id) {
         return repository.findAllById(id);
     }
 
-    public void pageLemmasFrequencyDecrement(Page page)
-    {
+    public void pageLemmasFrequencyDecrement(Page page) {
         repository.pageLemmasFrequencyDecrement(page);
     }
 
-    public Optional<Page> findByPathAndSite(String pageUrl, Site site)
-    {
-        return repository.findByPathAndSite(pageUrl,site);
+    public Optional<Page> findByPathAndSite(String pageUrl, Site site) {
+        return repository.findByPathAndSite(pageUrl, site);
     }
 
-    public void deleteAllInBatch()
-    {
+    public void deleteAllInBatch() {
         repository.deleteAllInBatch();
     }
 
-    public int countBySite(Site site)
-    {
+    public int countBySite(Site site) {
         return repository.countBySite(site);
     }
 }

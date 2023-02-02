@@ -13,8 +13,8 @@ import java.util.Set;
 @Getter
 @Setter
 @Table(name = "pages")
-public class Page
-{
+public class Page {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
@@ -38,14 +38,12 @@ public class Page
             inverseJoinColumns = @JoinColumn(name = "lemma_id"))
     private Set<Lemma> lemmas;
 
-    public void addLemma(Lemma lemma)
-    {
+    public void addLemma(Lemma lemma) {
         lemmas.add(lemma);
         lemma.getPages().add(this);
     }
 
-    public void removePage(Lemma lemma)
-    {
+    public void removePage(Lemma lemma) {
         lemmas.remove(lemma);
         lemma.getPages().remove(this);
     }

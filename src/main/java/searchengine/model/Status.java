@@ -1,7 +1,7 @@
 package searchengine.model;
 
-public enum Status
-{
+public enum Status {
+
     INDEXING,
     INDEXED,
     FAILED

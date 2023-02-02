@@ -8,23 +8,20 @@ import searchengine.repositorys.IndexRepository;
 import java.util.List;
 
 @Service
-public class IndexService
-{
+public class IndexService {
+
     IndexRepository repository;
 
     @Autowired
-    IndexService(IndexRepository repository)
-    {
+    IndexService(IndexRepository repository) {
         this.repository = repository;
     }
 
-    public void saveAll(List<Index> indexes)
-    {
+    public void saveAll(List<Index> indexes) {
         repository.saveAll(indexes);
     }
 
-    public void deleteAllInBatch()
-    {
+    public void deleteAllInBatch() {
         repository.deleteAllInBatch();
     }
 

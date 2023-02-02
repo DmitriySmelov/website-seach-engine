@@ -17,8 +17,8 @@ import java.util.Set;
 @Setter
 @DynamicInsert
 @DynamicUpdate
-public class Lemma
-{
+public class Lemma {
+
     @Id
     @GeneratedValue(generator = "lemma_generator")
     @GenericGenerator(name = "lemma_generator", strategy = "increment")
@@ -40,14 +40,12 @@ public class Lemma
             inverseJoinColumns = @JoinColumn(name = "page_id"))
     private Set<Page> pages;
 
-    public void addPage(Page page)
-    {
+    public void addPage(Page page) {
         pages.add(page);
         page.getLemmas().add(this);
     }
 
-    public void removePage(Page page)
-    {
+    public void removePage(Page page) {
         pages.remove(page);
         page.getLemmas().remove(this);
     }

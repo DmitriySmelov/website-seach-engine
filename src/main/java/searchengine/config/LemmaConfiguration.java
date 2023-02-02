@@ -8,8 +8,8 @@ import org.springframework.context.annotation.Configuration;
 import java.io.IOException;
 
 @Configuration
-public class LemmaConfiguration
-{
+public class LemmaConfiguration {
+
     @Bean
     public LuceneMorphology luceneMorphology() throws IOException {
         return new RussianLuceneMorphology();

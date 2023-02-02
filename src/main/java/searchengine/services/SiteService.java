@@ -11,53 +11,44 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class SiteService
-{
+public class SiteService {
+
     SiteRepository repository;
 
     @Autowired
-    SiteService(SiteRepository repository)
-    {
+    SiteService(SiteRepository repository) {
         this.repository = repository;
     }
 
-    public Site save(Site site)
-    {
+    public Site save(Site site) {
         return repository.save(site);
     }
 
-    public Integer findIndexedSitId()
-    {
+    public Integer findIndexedSitId() {
         return repository.findIndexedSitId();
     }
 
-    public Integer getSiteIdIfIndexed(String siteUrl)
-    {
+    public Integer getSiteIdIfIndexed(String siteUrl) {
         return repository.getSiteIdIfIndexed(siteUrl);
     }
 
-    public void deleteAllInBatch()
-    {
+    public void deleteAllInBatch() {
         repository.deleteAllInBatch();
     }
 
-    public Optional<Site> findByUrlAndStatus(String url, Status status)
-    {
+    public Optional<Site> findByUrlAndStatus(String url, Status status) {
         return repository.findByUrlAndStatus(url, status);
     }
 
-    public void updateAllStatusTime(Iterable<Integer> indexingSiteIds, LocalDateTime localDateTime)
-    {
+    public void updateAllStatusTime(Iterable<Integer> indexingSiteIds, LocalDateTime localDateTime) {
         repository.updateAllStatusTime(indexingSiteIds, localDateTime);
     }
 
-    public long count()
-    {
+    public long count() {
         return repository.count();
     }
 
-    public List<Site> findAll()
-    {
+    public List<Site> findAll() {
         return repository.findAll();
     }
 }

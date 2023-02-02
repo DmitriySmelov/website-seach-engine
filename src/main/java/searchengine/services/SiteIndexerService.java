@@ -1,7 +1,7 @@
 package searchengine.services;
 
-public interface SiteIndexerService
-{
+public interface SiteIndexerService {
+
     void startIndexing();
 
     boolean stopIndexing();

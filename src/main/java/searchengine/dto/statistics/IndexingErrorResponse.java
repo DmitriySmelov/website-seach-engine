@@ -5,8 +5,8 @@ import lombok.RequiredArgsConstructor;
 
 @Data
 @RequiredArgsConstructor
-public class IndexingErrorResponse
-{
+public class IndexingErrorResponse {
+
     private boolean result = false;
     private final String error;
 }

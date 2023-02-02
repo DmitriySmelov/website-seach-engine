@@ -11,8 +11,8 @@ import searchengine.model.Site;
 import java.util.Optional;
 
 @Repository
-public interface PageRepository extends JpaRepository<Page, Integer>, CustomPageRepository
-{
+public interface PageRepository extends JpaRepository<Page, Integer>, CustomPageRepository {
+
     int countBySite(Site site);
 
     Optional<Page> findByPathAndSite(String path, Site site);

@@ -5,8 +5,8 @@ import lombok.Setter;
 
 @Data
 @Setter
-public class TotalStatistics
-{
+public class TotalStatistics {
+
     private long sites;
     private int pages;
     private int lemmas;

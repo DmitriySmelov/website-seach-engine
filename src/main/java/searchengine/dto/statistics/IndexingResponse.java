@@ -7,12 +7,11 @@ import lombok.Setter;
 @Data
 @Setter
 @Getter
-public class IndexingResponse
-{
+public class IndexingResponse {
+
     private boolean result;
 
-    public IndexingResponse(boolean result)
-    {
-        this.result =result;
+    public IndexingResponse(boolean result) {
+        this.result = result;
     }
 }

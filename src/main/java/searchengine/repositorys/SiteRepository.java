@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
-public interface SiteRepository extends JpaRepository<Site, Integer>
-{
+public interface SiteRepository extends JpaRepository<Site, Integer> {
+
     @Query(value = "select id from sites where status = 'INDEXED' limit 1", nativeQuery = true)
     Integer findIndexedSitId();
 

@@ -10,8 +10,8 @@ import java.util.List;
 @Data
 @Setter
 @Getter
-public class PageSearchResponse
-{
+public class PageSearchResponse {
+
     private boolean result;
     private BigInteger count;
     private List<PageSearchData> data;

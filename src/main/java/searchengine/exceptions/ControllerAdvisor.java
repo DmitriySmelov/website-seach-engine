@@ -10,14 +10,13 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import searchengine.dto.statistics.IndexingErrorResponse;
 
 @ControllerAdvice
-public class ControllerAdvisor extends ResponseEntityExceptionHandler
-{
+public class ControllerAdvisor extends ResponseEntityExceptionHandler {
+
     private final Logger log = LogManager.getLogger(ControllerAdvisor.class.getName());
 
     @ExceptionHandler({IndexingException.class, SearchException.class})
     public ResponseEntity<IndexingErrorResponse> handleIndexingExceptions(
-            IndexingException ex, WebRequest request)
-    {
+            IndexingException ex, WebRequest request) {
         log.info(ex);
 
         IndexingErrorResponse response = new IndexingErrorResponse(ex.getUserErrorMessage());

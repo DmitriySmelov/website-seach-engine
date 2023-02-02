@@ -15,8 +15,8 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class StatisticsServiceImpl implements StatisticsService
-{
+public class StatisticsServiceImpl implements StatisticsService {
+
     private LemmaService lemmaService;
     private SiteService siteService;
     private PageService pageService;
@@ -24,8 +24,7 @@ public class StatisticsServiceImpl implements StatisticsService
 
     @Autowired
     StatisticsServiceImpl(SiteService siteService, PageService pageService,
-                          LemmaService lemmaService, SiteIndexerService siteIndexerService)
-    {
+                          LemmaService lemmaService, SiteIndexerService siteIndexerService) {
         this.lemmaService = lemmaService;
         this.pageService = pageService;
         this.siteService = siteService;
@@ -33,16 +32,14 @@ public class StatisticsServiceImpl implements StatisticsService
     }
 
     @Override
-    public StatisticsResponse getStatistics()
-    {
+    public StatisticsResponse getStatistics() {
         TotalStatistics total = new TotalStatistics();
         total.setSites(siteService.count());
         total.setIndexing(siteIndexerService.isIndexingStarted());
 
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
         List<Site> sitesList = siteService.findAll();
-        for (Site site : sitesList)
-        {
+        for (Site site : sitesList) {
             DetailedStatisticsItem item = new DetailedStatisticsItem();
             item.setName(site.getName());
             item.setUrl(site.getUrl());

@@ -17,8 +17,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
-public class SearchServiceImpl implements SearchService
-{
+public class SearchServiceImpl implements SearchService {
+
     private double frequencyFactor = 0.9;
     private LuceneMorphology luceneMorphology;
     private LemmaService lemmaService;
@@ -27,16 +27,14 @@ public class SearchServiceImpl implements SearchService
 
     @Autowired
     private SearchServiceImpl(LuceneMorphology luceneMorphology, LemmaService lemmaService,
-                              PageService pageService, SiteService siteService)
-    {
+                              PageService pageService, SiteService siteService) {
         this.siteService = siteService;
         this.luceneMorphology = luceneMorphology;
         this.lemmaService = lemmaService;
         this.pageService = pageService;
     }
 
-    public PageSearchResponse search(String query, String siteUrl, int limit, int offset)
-    {
+    public PageSearchResponse search(String query, String siteUrl, int limit, int offset) {
         Integer siteId = checkIsSearchPossibilityAndGetInfoForSearch(siteUrl);
         String[] russianLemmas = getRussianWordsFromText(query.trim());
         List<String> lemmasForSearch = Arrays.stream(russianLemmas)
@@ -51,8 +49,7 @@ public class SearchServiceImpl implements SearchService
         PageSearchResponse response = new PageSearchResponse();
         response.setResult(true);
 
-        if(pageInfo.size() == 0)
-        {
+        if (pageInfo.size() == 0) {
             response.setCount(BigInteger.valueOf(0));
             response.setData(new ArrayList<>());
             return response;
@@ -66,8 +63,7 @@ public class SearchServiceImpl implements SearchService
         return response;
     }
 
-    private List<PageSearchData> getSearchData(List<SearchPageInfo> pagesInfo, List<String> lemmas)
-    {
+    private List<PageSearchData> getSearchData(List<SearchPageInfo> pagesInfo, List<String> lemmas) {
         List<PageSearchData> searchData = new ArrayList<>();
 
         Map<Integer, Double> pageRelevanceMap = pagesInfo.stream()
@@ -81,13 +77,11 @@ public class SearchServiceImpl implements SearchService
         return searchData;
     }
 
-    private Integer checkIsSearchPossibilityAndGetInfoForSearch(String siteUrl)
-    {
+    private Integer checkIsSearchPossibilityAndGetInfoForSearch(String siteUrl) {
         boolean isSearchByAllSites = siteUrl == null;
         Integer indexedSiteId = isSearchByAllSites ?
                 siteService.findIndexedSitId() : siteService.getSiteIdIfIndexed(siteUrl);
-        if (indexedSiteId == null)
-        {
+        if (indexedSiteId == null) {
             String userError = siteUrl == null ? "сайтов" : "введенного сайта";
             String logError = siteUrl == null ? "sites" : "site " + siteUrl;
             throw new IndexingException(String.format("Не удалось совершить поиск, причина: " +
@@ -98,15 +92,14 @@ public class SearchServiceImpl implements SearchService
         return isSearchByAllSites ? null : indexedSiteId;
     }
 
-    private PageSearchData getDataFromPageInfo(Page page, List<String> lemmas, Map<Integer, Double> pageRelevanceMap)
-    {
+    private PageSearchData getDataFromPageInfo(Page page, List<String> lemmas, Map<Integer, Double> pageRelevanceMap) {
         Document doc = Jsoup.parse(page.getContent());
         StringBuilder text = new StringBuilder();
 
         doc.getAllElements().forEach(el ->
         {
             String elText = el.ownText();
-            if(!elText.isBlank()) text.append(el.ownText()).append(" ");
+            if (!elText.isBlank()) text.append(el.ownText()).append(" ");
         });
 
         PageSearchData data = new PageSearchData();
@@ -120,19 +113,17 @@ public class SearchServiceImpl implements SearchService
 
         data.setSnippet(finder.getSnippet(text.toString(), lemmas));
 
-        return  data;
+        return data;
     }
 
-    public String[] getRussianWordsFromText(String text)
-    {
+    public String[] getRussianWordsFromText(String text) {
         return text
                 .toLowerCase()
                 .replaceAll("ё", "е")
                 .split("[^а-я]+");
     }
 
-    private class SnippetFinder
-    {
+    private class SnippetFinder {
         int snippetLength;
         int lettersBeforeFirstSnippetLemma;
         int begin;
@@ -142,14 +133,12 @@ public class SearchServiceImpl implements SearchService
         StringBuilder snippet;
         Pattern pattern;
 
-        private SnippetFinder(int snippetLength, int lettersBeforeFirstSnippetLemma)
-        {
+        private SnippetFinder(int snippetLength, int lettersBeforeFirstSnippetLemma) {
             this.snippetLength = snippetLength;
             this.lettersBeforeFirstSnippetLemma = lettersBeforeFirstSnippetLemma;
         }
 
-        private StringBuilder getSnippet(String text, List<String> lemmas)
-        {
+        private StringBuilder getSnippet(String text, List<String> lemmas) {
             this.text = text;
             snippet = new StringBuilder();
             pattern = Pattern.compile(getSearchRegex(lemmas));
@@ -165,29 +154,25 @@ public class SearchServiceImpl implements SearchService
             return snippet;
         }
 
-        private StringBuilder getSnippetFromText(Set<String> lemmas, Matcher match)
-        {
+        private StringBuilder getSnippetFromText(Set<String> lemmas, Matcher match) {
             StringBuilder snippet = new StringBuilder();
-            while (match.find())
-            {
+            while (match.find()) {
                 String word = match.group(1).replaceAll("ё", "е");
-                if(!lemmas.contains(luceneMorphology.getNormalForms(word).get(0))) continue;
+                if (!lemmas.contains(luceneMorphology.getNormalForms(word).get(0))) continue;
 
                 int start = match.start() + 1;
-                int end = match.end() -1;
+                int end = match.end() - 1;
 
-                if(finish == 0)
-                {
+                if (finish == 0) {
                     begin = start <= lettersBeforeFirstSnippetLemma ? 0 : start - lettersBeforeFirstSnippetLemma;
                     finish = begin + snippetLength;
-                    if(match.start() == 0 && text.charAt(0) == word.charAt(0)) start = 0;
+                    if (match.start() == 0 && text.charAt(0) == word.charAt(0)) start = 0;
 
                     isSubstring = true;
                 }
-                if(start != 0) snippet.append(text, begin, start);
+                if (start != 0) snippet.append(text, begin, start);
                 snippet.append("<b>").append(word).append("</b>");
-                if(isSubstring)
-                {
+                if (isSubstring) {
                     begin = 0;
                     text = text.substring(end, finish);
                     match = pattern.matcher(text);
@@ -199,8 +184,7 @@ public class SearchServiceImpl implements SearchService
             return snippet;
         }
 
-        private String getSearchRegex(List<String> lemmas)
-        {
+        private String getSearchRegex(List<String> lemmas) {
             StringBuilder regex = new StringBuilder();
             String russianLetters = "[а-яё]";
             String startOfRegex = "(?:[^а-яё]|^)(";
@@ -208,12 +192,10 @@ public class SearchServiceImpl implements SearchService
             int lemmasSize = lemmas.size() - 1;
 
             regex.append(startOfRegex);
-            for(int i = 0; i <= lemmasSize; i ++)
-            {
+            for (int i = 0; i <= lemmasSize; i++) {
                 String lemma = lemmas.get(i);
                 regex.append("(");
-                switch (lemma.length())
-                {
+                switch (lemma.length()) {
                     case 1, 2 -> regex.append(getLemmaRegex(lemma));
                     case 3 -> regex.append(getLemmaRegex(lemma)).append(russianLetters).append("{0,2}");
                     case 4 -> regex.append(getLemmaRegex(lemma.substring(0, lemma.length() - 1)))
@@ -222,14 +204,13 @@ public class SearchServiceImpl implements SearchService
                             .append(russianLetters).append("{0,4}");
                 }
                 regex.append(")");
-                if(i != lemmasSize) regex.append("|");
+                if (i != lemmasSize) regex.append("|");
             }
             regex.append(endOfRegex);
             return regex.toString();
         }
 
-        private String getLemmaRegex(String lemma)
-        {
+        private String getLemmaRegex(String lemma) {
             return lemma.replaceAll("[её]", "[её]");
         }
     }

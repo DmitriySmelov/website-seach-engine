@@ -26,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 
 @Service
-public class SiteIndexerServiceImpl implements SiteIndexerService
-{
+public class SiteIndexerServiceImpl implements SiteIndexerService {
+
     @Setter
     @Getter
     private volatile boolean isIndexingStarted;
@@ -44,16 +44,14 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
 
     @Autowired
     public SiteIndexerServiceImpl(SiteService siteService, IndexingConfig indexingConfig,
-                                  LemmaIndexerService lemmaIndexer, PageService pageService)
-    {
+                                  LemmaIndexerService lemmaIndexer, PageService pageService) {
         this.siteService = siteService;
         this.indexingConfig = indexingConfig;
         this.lemmaIndexer = lemmaIndexer;
         this.pageService = pageService;
     }
 
-    synchronized public boolean isStartIndexingPossibility()
-    {
+    synchronized public boolean isStartIndexingPossibility() {
         if (isIndexingStarted) throw new IndexingException("Индексация уже запущена.",
                 "attempt to start indexing failed, reason: indexing is already started", HttpStatus.FORBIDDEN);
 
@@ -62,22 +60,18 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
     }
 
     @Async
-    public void startIndexing()
-    {
-        try
-        {
+    public void startIndexing() {
+        try {
             indexingAllSites();
         }
-        finally
-        {
+        finally {
             setIndexingStarted(false);
             setIndexingStopped(false);
             indexingSiteIds.clear();
         }
     }
 
-    private void indexingAllSites()
-    {
+    private void indexingAllSites() {
         deleteAllSites();
         List<Site> sites = getAllSitesFromConfig();
 
@@ -88,15 +82,13 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         forkJoinPool.invokeAll(indexingTasks);
     }
 
-    private void deleteAllSites()
-    {
+    private void deleteAllSites() {
         lemmaIndexer.deleteAll();
         pageService.deleteAllInBatch();
         siteService.deleteAllInBatch();
     }
 
-    private List<Site> getAllSitesFromConfig()
-    {
+    private List<Site> getAllSitesFromConfig() {
         return indexingConfig.getSites()
                 .stream()
                 .map(s -> {
@@ -112,27 +104,22 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
                 }).toList();
     }
 
-    private void runStatusTimeRefresher()
-    {
+    private void runStatusTimeRefresher() {
         Thread thread = new Thread(() -> {
-            try
-            {
-                while (!indexingSiteIds.isEmpty())
-                {
+            try {
+                while (!indexingSiteIds.isEmpty()) {
                     siteService.updateAllStatusTime(indexingSiteIds, LocalDateTime.now());
                     Thread.sleep(10_000);
                 }
             }
-            catch (InterruptedException e)
-            {
+            catch (InterruptedException e) {
                 e.printStackTrace();
             }
         });
         thread.start();
     }
 
-    private List<Callable<Boolean>> getIndexingTasks(List<Site> sites)
-    {
+    private List<Callable<Boolean>> getIndexingTasks(List<Site> sites) {
         List<Callable<Boolean>> indexingTasks = new ArrayList<>();
 
         sites.forEach(site ->
@@ -140,8 +127,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
             PageInfo info = indexingPage(site, site.getUrl(), "/");
             Page mainPage = info != null ? info.getPage() : null;
 
-            if (!determineSiteLastError(site, mainPage))
-            {
+            if (!determineSiteLastError(site, mainPage)) {
                 indexingSiteIds.add(site.getId());
                 List<ForkJoinParser> siteIndexersTasks = new ArrayList<>();
                 Indexer indexer = new Indexer(site);
@@ -157,20 +143,18 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         return indexingTasks;
     }
 
-    private PageInfo indexingPage(Site site, String pageUrl, String urlForSaving)
-    {
+    private PageInfo indexingPage(Site site, String pageUrl, String urlForSaving) {
         return defaultIndexer.indexing(site, pageUrl, urlForSaving);
     }
 
-    private Callable<Boolean> getSingleSiteIndexingTask(Indexer indexer, List<ForkJoinParser> tasks)
-    {
+    private Callable<Boolean> getSingleSiteIndexingTask(Indexer indexer, List<ForkJoinParser> tasks) {
         return () -> {
             Integer siteId = indexer.getSite().getId();
             indexingSiteIds.add(siteId);
             ForkJoinParser.invokeAll(tasks);
             indexingSiteIds.remove(siteId);
 
-            if(indexer.getStatus() != Status.FAILED) indexer.setStatus(Status.INDEXED);
+            if (indexer.getStatus() != Status.FAILED) indexer.setStatus(Status.INDEXED);
             indexer.getSite().setStatusTime(LocalDateTime.now());
             siteService.save(indexer.getSite());
             indexer.clear();
@@ -178,12 +162,11 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         };
     }
 
-    private boolean determineSiteLastError(Site site, Page mainPage)
-    {
+    private boolean determineSiteLastError(Site site, Page mainPage) {
         String siteError = getErrorMessage(mainPage);
         site.setLastError(siteError);
 
-        if(siteError.equals("")) return false;
+        if (siteError.equals("")) return false;
 
         site.setStatus(Status.FAILED);
         siteService.save(site);
@@ -191,45 +174,37 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         return true;
     }
 
-    private String getErrorMessage(Page page)
-    {
+    private String getErrorMessage(Page page) {
         String defaultError = "Ошибка индексации: не удалось проиндексировать сайт " +
                 "проверьте корректность введенных данных.";
-        if (page != null)
-        {
+        if (page != null) {
             int statusCode = page.getCode();
 
-            if (statusCode == 200)
-            {
+            if (statusCode == 200) {
                 return "";
             }
 
-            if (statusCode >= 300 && statusCode < 400)
-            {
+            if (statusCode >= 300 && statusCode < 400) {
                 return "Ошибка индексации: url запрашиваемого ресурса возможно был " +
                         "временно(постоянно) изменён, проверьте корректность введенных данных.";
             }
-            else
-            {
-                return switch (statusCode)
-                        {
-                            case 400, 403 -> "Ошибка индексации: отказ в доступе со стороны сайта.";
-                            case 404 -> "Ошибка индексации: главная страница сайта не найдена.";
-                            case 500 -> "Ошибка индексации: ошибка сервера со стороны сайта.";
-                            default -> defaultError;
-                        };
+            else {
+                return switch (statusCode) {
+                    case 400, 403 -> "Ошибка индексации: отказ в доступе со стороны сайта.";
+                    case 404 -> "Ошибка индексации: главная страница сайта не найдена.";
+                    case 500 -> "Ошибка индексации: ошибка сервера со стороны сайта.";
+                    default -> defaultError;
+                };
             }
         }
         return defaultError;
     }
 
-    private String getValidUrlFormat(String url)
-    {
+    private String getValidUrlFormat(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
-    synchronized public boolean stopIndexing()
-    {
+    synchronized public boolean stopIndexing() {
         if (!isIndexingStarted) throw new IndexingException("Индексация не запущена",
                 "attempt to stop indexing failed, reason: indexing not started", HttpStatus.FORBIDDEN);
 
@@ -238,14 +213,12 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         return true;
     }
 
-    private String getValidPageUrlForSaving(String url, int rootUrlLength)
-    {
+    private String getValidPageUrlForSaving(String url, int rootUrlLength) {
         return url.endsWith("/") ?
-                url.substring(rootUrlLength, url.length() -1) : url.substring(rootUrlLength);
+                url.substring(rootUrlLength, url.length() - 1) : url.substring(rootUrlLength);
     }
 
-    public boolean indexingUserInputPage(String pageUrl)
-    {
+    public boolean indexingUserInputPage(String pageUrl) {
         Page page = null;
         SiteConfig siteFromConfig = getSiteForReindexingPage(pageUrl);
 
@@ -257,17 +230,15 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         optionalPage.ifPresent(this::deletePageForReindexing);
         PageInfo info = indexingPage(site, pageUrl, validPageUrl);
 
-        if(info == null)
-        {
+        if (info == null) {
             String error = getErrorMessage(page);
-            throw new IndexingException(error, String.format("request to index page(%s) by user failed",pageUrl),
+            throw new IndexingException(error, String.format("request to index page(%s) by user failed", pageUrl),
                     HttpStatus.BAD_REQUEST);
         }
         return true;
     }
 
-    private SiteConfig getSiteForReindexingPage(String pageUrl)
-    {
+    private SiteConfig getSiteForReindexingPage(String pageUrl) {
         return indexingConfig.getSites()
                 .stream()
                 .filter(site -> pageUrl.contains(site.getUrl())).findAny().orElseThrow(() ->
@@ -278,14 +249,12 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
                 );
     }
 
-    private void deletePageForReindexing(Page page)
-    {
+    private void deletePageForReindexing(Page page) {
         pageService.pageLemmasFrequencyDecrement(page);
         pageService.deleteById(page.getId());
     }
 
-    private Site getSiteFromDB(String siteUrl)
-    {
+    private Site getSiteFromDB(String siteUrl) {
         return siteService
                 .findByUrlAndStatus(getValidUrlFormat(siteUrl), Status.INDEXED)
                 .orElseThrow(() -> new IndexingException("Ошибка: сайт с введенной страницей не проиндексирован.",
@@ -293,43 +262,36 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
     }
 
     @NoArgsConstructor
-    public class Indexer
-        {
+    public class Indexer {
         private Set<String> uniqueUrls = ConcurrentHashMap.newKeySet();
         int siteUrlLength;
         @Getter
         Site site;
 
-        Indexer(Site site)
-        {
+        Indexer(Site site) {
             this.site = site;
             siteUrlLength = site.getUrl().length();
         }
 
-        public String getUrlForSaving(String url)
-        {
+        public String getUrlForSaving(String url) {
             return getValidPageUrlForSaving(url, siteUrlLength);
         }
 
-        public PageInfo indexing(Site site, String pageUrl, String urlForSaving)
-        {
-            try
-            {
+        public PageInfo indexing(Site site, String pageUrl, String urlForSaving) {
+            try {
                 Connection.Response response = connectionToUrl(pageUrl);
 
                 if (!response.contentType().contains("text/html")) return null;
 
                 return getPageInfo(response, site, urlForSaving);
             }
-            catch (IOException e)
-            {
+            catch (IOException e) {
                 log.debug("Error when trying to connect to URI during indexing.", e);
             }
             return null;
         }
 
-        private Connection.Response connectionToUrl(String url) throws IOException
-        {
+        private Connection.Response connectionToUrl(String url) throws IOException {
             return Jsoup.connect(url)
                     .userAgent(indexingConfig.getUserAgent())
                     .referrer(indexingConfig.getReferrer())
@@ -338,8 +300,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
         }
 
         private PageInfo getPageInfo(Connection.Response response, Site site, String urlForSaving)
-                throws IOException
-        {
+                throws IOException {
 
             int statusCode = response.statusCode();
 
@@ -348,8 +309,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
             page.setCode(statusCode);
             page.setSite(site);
 
-            if(statusCode == 200)
-            {
+            if (statusCode == 200) {
                 Document doc = response.parse();
                 page.setContent(doc.outerHtml());
                 pageService.save(page);
@@ -358,49 +318,37 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
 
                 PageInfo info = getPageInfoFromHtml(doc, page);
 
-                urlForSaving = null;
-                response = null;
-                doc = null;
-
                 return info;
             }
-            else
-            {
+            else {
                 page.setContent("");
                 pageService.save(page);
             }
             return null;
         }
 
-        private void startLemmaIndexing(Site site, Page page, Document html)
-        {
+        private void startLemmaIndexing(Site site, Page page, Document html) {
             Map<Lemma, Float> lemmas = lemmaIndexer.getLemmas(site, page, html);
-            synchronized (this)
-            {
+            synchronized (this) {
                 lemmaIndexer.saveNewLemmas(lemmas);
             }
-            synchronized (this)
-            {
+            synchronized (this) {
                 lemmaIndexer.saveIndexesByLemma(lemmas, page);
             }
         }
 
-        private PageInfo getPageInfoFromHtml(Document html, Page page)
-        {
-            if(html != null)
-            {
+        private PageInfo getPageInfoFromHtml(Document html, Page page) {
+            if (html != null) {
                 List<String> childLinks = html
                         .select("a")
                         .eachAttr("abs:href");
 
                 return new PageInfo(page, childLinks);
             }
-
             return null;
         }
 
-        public boolean isCorrectUrl(String pageUrl, String rootUrl)
-        {
+        public boolean isCorrectUrl(String pageUrl, String rootUrl) {
             pageUrl = getValidUrlFormat(pageUrl);
             return pageUrl.startsWith(rootUrl)
                     && !pageUrl.contains("#")
@@ -409,32 +357,27 @@ public class SiteIndexerServiceImpl implements SiteIndexerService
                     && addUrl(pageUrl);
         }
 
-        public boolean checkIsIndexingStopped()
-        {
-            if(!isIndexingStopped) return false;
+        public boolean checkIsIndexingStopped() {
+            if (!isIndexingStopped) return false;
 
             site.setStatus(Status.FAILED);
             site.setLastError("Индексация остановлена пользователем.");
             return true;
         }
 
-        public Status getStatus()
-        {
+        public Status getStatus() {
             return site.getStatus();
         }
 
-        public void setStatus(Status status)
-        {
+        public void setStatus(Status status) {
             site.setStatus(status);
         }
 
-        public void clear()
-        {
+        public void clear() {
             uniqueUrls.clear();
         }
 
-        public boolean addUrl(String pageUrl)
-        {
+        public boolean addUrl(String pageUrl) {
             return uniqueUrls.add(pageUrl);
         }
     }
