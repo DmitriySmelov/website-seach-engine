@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.siteindexing;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,9 +14,12 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import searchengine.config.IndexingConfig;
 import searchengine.config.SiteConfig;
-import searchengine.dto.statistics.*;
+import searchengine.dto.indexing.PageInfo;
 import searchengine.exceptions.IndexingException;
 import searchengine.model.*;
+import searchengine.services.lemmaindexing.LemmaIndexerService;
+import searchengine.services.PageService;
+import searchengine.services.SiteService;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -37,9 +40,9 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
     private final SiteService siteService;
     private final IndexingConfig indexingConfig;
     private final PageService pageService;
-    private Set<Integer> indexingSiteIds = ConcurrentHashMap.newKeySet();
-    private Indexer defaultIndexer = new Indexer();
-    private ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
+    private final Set<Integer> indexingSiteIds = ConcurrentHashMap.newKeySet();
+    private final Indexer defaultIndexer = new Indexer();
+    private final ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
     private final Logger log = LogManager.getLogger(SiteIndexerServiceImpl.class.getName());
 
     @Autowired
@@ -62,24 +65,21 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
     @Async
     public void startIndexing() {
         try {
-            indexingAllSites();
+        deleteAllSites();
+
+        List<Site> sites = getAllSitesFromConfig();
+
+        List<Callable<Boolean>> indexingTasks = getIndexingTasks(sites);
+
+        runSiteStatusTimeRefresher(sites);
+
+        forkJoinPool.invokeAll(indexingTasks);
         }
         finally {
             setIndexingStarted(false);
             setIndexingStopped(false);
             indexingSiteIds.clear();
         }
-    }
-
-    private void indexingAllSites() {
-        deleteAllSites();
-        List<Site> sites = getAllSitesFromConfig();
-
-        List<Callable<Boolean>> indexingTasks = getIndexingTasks(sites);
-
-        runStatusTimeRefresher();
-
-        forkJoinPool.invokeAll(indexingTasks);
     }
 
     private void deleteAllSites() {
@@ -104,9 +104,11 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
                 }).toList();
     }
 
-    private void runStatusTimeRefresher() {
+    private void runSiteStatusTimeRefresher(List<Site> sites) {
         Thread thread = new Thread(() -> {
             try {
+                sites.forEach(site ->indexingSiteIds.add(site.getId()));
+
                 while (!indexingSiteIds.isEmpty()) {
                     siteService.updateAllStatusTime(indexingSiteIds, LocalDateTime.now());
                     Thread.sleep(10_000);
@@ -128,15 +130,14 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
             Page mainPage = info != null ? info.getPage() : null;
 
             if (!determineSiteLastError(site, mainPage)) {
-                indexingSiteIds.add(site.getId());
-                List<ForkJoinParser> siteIndexersTasks = new ArrayList<>();
                 Indexer indexer = new Indexer(site);
-                indexer.addUrl(getValidUrlFormat(site.getUrl()));
+                indexer.addUniqueUrl(getValidUrlFormat(site.getUrl()));
 
-                siteIndexersTasks.addAll(info.getChildLinks().stream().filter(link -> indexer.isCorrectUrl(link, site.getUrl()))
+                List<ForkJoinParser> parserTasks = new ArrayList<>(info.getChildLinks().stream()
+                        .filter(link -> indexer.isCorrectUrl(link, site.getUrl()))
                         .map(link -> new ForkJoinParser(indexer, link)).toList());
 
-                indexingTasks.add(getSingleSiteIndexingTask(indexer, siteIndexersTasks));
+                indexingTasks.add(getSingleSiteIndexingTask(indexer, parserTasks));
 
             }
         });
@@ -149,9 +150,8 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
 
     private Callable<Boolean> getSingleSiteIndexingTask(Indexer indexer, List<ForkJoinParser> tasks) {
         return () -> {
-            Integer siteId = indexer.getSite().getId();
-            indexingSiteIds.add(siteId);
             ForkJoinParser.invokeAll(tasks);
+            Integer siteId = indexer.getSite().getId();
             indexingSiteIds.remove(siteId);
 
             if (indexer.getStatus() != Status.FAILED) indexer.setStatus(Status.INDEXED);
@@ -219,7 +219,6 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
     }
 
     public boolean indexingUserInputPage(String pageUrl) {
-        Page page = null;
         SiteConfig siteFromConfig = getSiteForReindexingPage(pageUrl);
 
         Site site = getSiteFromDB(siteFromConfig.getUrl());
@@ -231,7 +230,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
         PageInfo info = indexingPage(site, pageUrl, validPageUrl);
 
         if (info == null) {
-            String error = getErrorMessage(page);
+            String error = getErrorMessage(null);
             throw new IndexingException(error, String.format("request to index page(%s) by user failed", pageUrl),
                     HttpStatus.BAD_REQUEST);
         }
@@ -264,9 +263,9 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
     @NoArgsConstructor
     public class Indexer {
         private Set<String> uniqueUrls = ConcurrentHashMap.newKeySet();
-        int siteUrlLength;
+        private int siteUrlLength;
         @Getter
-        Site site;
+        private Site site;
 
         Indexer(Site site) {
             this.site = site;
@@ -279,7 +278,11 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
 
         public PageInfo indexing(Site site, String pageUrl, String urlForSaving) {
             try {
-                Connection.Response response = connectionToUrl(pageUrl);
+                Connection.Response response = Jsoup.connect(pageUrl)
+                        .userAgent(indexingConfig.getUserAgent())
+                        .referrer(indexingConfig.getReferrer())
+                        .ignoreContentType(true)
+                        .execute();;
 
                 if (!response.contentType().contains("text/html")) return null;
 
@@ -289,14 +292,6 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
                 log.debug("Error when trying to connect to URI during indexing.", e);
             }
             return null;
-        }
-
-        private Connection.Response connectionToUrl(String url) throws IOException {
-            return Jsoup.connect(url)
-                    .userAgent(indexingConfig.getUserAgent())
-                    .referrer(indexingConfig.getReferrer())
-                    .ignoreContentType(true)
-                    .execute();
         }
 
         private PageInfo getPageInfo(Connection.Response response, Site site, String urlForSaving)
@@ -316,9 +311,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
 
                 startLemmaIndexing(site, page, doc);
 
-                PageInfo info = getPageInfoFromHtml(doc, page);
-
-                return info;
+                return getPageInfoFromHtml(doc, page);
             }
             else {
                 page.setContent("");
@@ -354,7 +347,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
                     && !pageUrl.contains("#")
                     && !pageUrl.contains("?")
                     && !pageUrl.matches(".+(?i)(?:.jpg/?|.png/?|.pdf/?)$")
-                    && addUrl(pageUrl);
+                    && addUniqueUrl(pageUrl);
         }
 
         public boolean checkIsIndexingStopped() {
@@ -377,7 +370,7 @@ public class SiteIndexerServiceImpl implements SiteIndexerService {
             uniqueUrls.clear();
         }
 
-        public boolean addUrl(String pageUrl) {
+        public boolean addUniqueUrl(String pageUrl) {
             return uniqueUrls.add(pageUrl);
         }
     }

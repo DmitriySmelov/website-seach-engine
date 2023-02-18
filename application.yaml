@@ -26,8 +26,6 @@ spring:
 
 indexing-settings:
   sites:
-    - url: https://volochek.life/
-      name: Volochek
     - url: https://dombulgakova.ru/
       name: Dombulgakova
     - url: http://cimus.biz

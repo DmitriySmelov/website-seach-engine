@@ -3,12 +3,12 @@ package searchengine.controllers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import searchengine.dto.statistics.IndexingResponse;
-import searchengine.dto.statistics.PageSearchResponse;
+import searchengine.dto.indexing.IndexingResponse;
+import searchengine.dto.search.PageSearchResponse;
 import searchengine.dto.statistics.StatisticsResponse;
-import searchengine.services.SearchService;
-import searchengine.services.SiteIndexerService;
-import searchengine.services.StatisticsService;
+import searchengine.services.search.SearchService;
+import searchengine.services.siteindexing.SiteIndexerService;
+import searchengine.services.statistics.StatisticsService;
 
 @RestController
 @RequestMapping("/api")

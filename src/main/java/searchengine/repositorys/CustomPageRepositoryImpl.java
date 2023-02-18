@@ -1,7 +1,7 @@
 package searchengine.repositorys;
 
 import org.springframework.http.HttpStatus;
-import searchengine.dto.statistics.SearchPageInfo;
+import searchengine.dto.search.SearchPageInfo;
 import searchengine.exceptions.SearchException;
 
 import javax.persistence.*;

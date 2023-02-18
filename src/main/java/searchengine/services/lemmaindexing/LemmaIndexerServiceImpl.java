@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.lemmaindexing;
 
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.jsoup.nodes.Document;
@@ -7,6 +7,9 @@ import searchengine.model.Index;
 import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.model.Site;
+import searchengine.services.IndexService;
+import searchengine.services.LemmaService;
+import searchengine.services.search.SearchService;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -18,10 +21,10 @@ import java.util.stream.Collectors;
 public class LemmaIndexerServiceImpl implements LemmaIndexerService {
 
     private final String[] particlesNames = new String[]{"МЕЖД", "ПРЕДЛ", "СОЮЗ", "ЧАСТ"};
-    private LuceneMorphology luceneMorphology;
-    private LemmaService lemmaService;
-    private IndexService indexService;
-    private SearchService searchService;
+    private final LuceneMorphology luceneMorphology;
+    private final LemmaService lemmaService;
+    private final IndexService indexService;
+    private final SearchService searchService;
 
     public LemmaIndexerServiceImpl(LuceneMorphology luceneMorphology, LemmaService lemmaService,
                                    IndexService indexService, SearchService searchService) {

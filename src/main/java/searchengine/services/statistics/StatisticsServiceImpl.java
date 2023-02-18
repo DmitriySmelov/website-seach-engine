@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.statistics;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +8,10 @@ import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
 import searchengine.model.Site;
+import searchengine.services.LemmaService;
+import searchengine.services.PageService;
+import searchengine.services.SiteService;
+import searchengine.services.siteindexing.SiteIndexerService;
 
 import java.time.ZoneId;
 import java.util.ArrayList;

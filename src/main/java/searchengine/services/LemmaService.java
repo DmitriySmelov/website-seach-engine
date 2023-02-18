@@ -12,7 +12,7 @@ import java.util.Optional;
 @Service
 public class LemmaService {
 
-    LemmaRepository repository;
+    private LemmaRepository repository;
 
     @Autowired
     LemmaService(LemmaRepository repository) {

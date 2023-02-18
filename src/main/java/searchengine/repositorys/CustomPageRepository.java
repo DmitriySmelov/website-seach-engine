@@ -1,6 +1,6 @@
 package searchengine.repositorys;
 
-import searchengine.dto.statistics.SearchPageInfo;
+import searchengine.dto.search.SearchPageInfo;
 
 import java.util.List;
 

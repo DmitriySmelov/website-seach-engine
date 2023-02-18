@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.lemmaindexing;
 
 import org.jsoup.nodes.Document;
 import searchengine.model.Lemma;

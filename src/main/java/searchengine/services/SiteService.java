@@ -13,7 +13,7 @@ import java.util.Optional;
 @Service
 public class SiteService {
 
-    SiteRepository repository;
+    private SiteRepository repository;
 
     @Autowired
     SiteService(SiteRepository repository) {

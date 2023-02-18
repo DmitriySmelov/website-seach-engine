@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.search;
 
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.jsoup.Jsoup;
@@ -6,9 +6,14 @@ import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import searchengine.dto.statistics.*;
+import searchengine.dto.search.PageSearchData;
+import searchengine.dto.search.PageSearchResponse;
+import searchengine.dto.search.SearchPageInfo;
 import searchengine.exceptions.IndexingException;
 import searchengine.model.*;
+import searchengine.services.LemmaService;
+import searchengine.services.PageService;
+import searchengine.services.SiteService;
 
 import java.math.BigInteger;
 import java.util.*;
@@ -20,10 +25,10 @@ import java.util.stream.Collectors;
 public class SearchServiceImpl implements SearchService {
 
     private double frequencyFactor = 0.9;
-    private LuceneMorphology luceneMorphology;
-    private LemmaService lemmaService;
-    private PageService pageService;
-    private SiteService siteService;
+    private final LuceneMorphology luceneMorphology;
+    private final LemmaService lemmaService;
+    private final PageService pageService;
+    private final SiteService siteService;
 
     @Autowired
     private SearchServiceImpl(LuceneMorphology luceneMorphology, LemmaService lemmaService,
@@ -36,7 +41,9 @@ public class SearchServiceImpl implements SearchService {
 
     public PageSearchResponse search(String query, String siteUrl, int limit, int offset) {
         Integer siteId = checkIsSearchPossibilityAndGetInfoForSearch(siteUrl);
+
         String[] russianLemmas = getRussianWordsFromText(query.trim());
+
         List<String> lemmasForSearch = Arrays.stream(russianLemmas)
                 .map(lem -> luceneMorphology.getNormalForms(lem).get(0)).toList();
 
@@ -79,8 +86,10 @@ public class SearchServiceImpl implements SearchService {
 
     private Integer checkIsSearchPossibilityAndGetInfoForSearch(String siteUrl) {
         boolean isSearchByAllSites = siteUrl == null;
+
         Integer indexedSiteId = isSearchByAllSites ?
                 siteService.findIndexedSitId() : siteService.getSiteIdIfIndexed(siteUrl);
+
         if (indexedSiteId == null) {
             String userError = siteUrl == null ? "сайтов" : "введенного сайта";
             String logError = siteUrl == null ? "sites" : "site " + siteUrl;
@@ -120,18 +129,18 @@ public class SearchServiceImpl implements SearchService {
         return text
                 .toLowerCase()
                 .replaceAll("ё", "е")
-                .split("[^а-я]+");
+                .split("[^а-яе]+");
     }
 
     private class SnippetFinder {
-        int snippetLength;
-        int lettersBeforeFirstSnippetLemma;
-        int begin;
-        int finish;
-        boolean isSubstring;
-        String text;
-        StringBuilder snippet;
-        Pattern pattern;
+        private int snippetLength;
+        private int lettersBeforeFirstSnippetLemma;
+        private int begin;
+        private int finish;
+        private boolean isSubstring;
+        private String text;
+        private StringBuilder snippet;
+        private Pattern pattern;
 
         private SnippetFinder(int snippetLength, int lettersBeforeFirstSnippetLemma) {
             this.snippetLength = snippetLength;

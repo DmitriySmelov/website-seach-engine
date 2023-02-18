@@ -1,7 +1,7 @@
 package searchengine.services;
 
 import org.springframework.stereotype.Service;
-import searchengine.dto.statistics.SearchPageInfo;
+import searchengine.dto.search.SearchPageInfo;
 import searchengine.model.Page;
 import searchengine.model.Site;
 import searchengine.repositorys.PageRepository;

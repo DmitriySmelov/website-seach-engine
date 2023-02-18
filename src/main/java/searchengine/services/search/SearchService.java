@@ -1,6 +1,6 @@
-package searchengine.services;
+package searchengine.services.search;
 
-import searchengine.dto.statistics.PageSearchResponse;
+import searchengine.dto.search.PageSearchResponse;
 
 public interface SearchService {
 

@@ -1,10 +1,10 @@
-package searchengine.services;
+package searchengine.services.siteindexing;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import searchengine.dto.statistics.PageInfo;
+import searchengine.dto.indexing.PageInfo;
 import searchengine.model.Site;
-import searchengine.services.SiteIndexerServiceImpl.Indexer;
+import searchengine.services.siteindexing.SiteIndexerServiceImpl.Indexer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +37,6 @@ public class ForkJoinParser extends RecursiveAction {
                     ForkJoinParser task = new ForkJoinParser(indexer, link);
                     taskList.add(task);
                 });
-                pageUrl = null;
 
                 if (!indexer.checkIsIndexingStopped()) ForkJoinParser.invokeAll(taskList);
             }
